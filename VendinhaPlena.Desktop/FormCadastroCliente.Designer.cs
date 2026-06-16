@@ -96,7 +96,6 @@
             btnSalvar.TabIndex = 6;
             btnSalvar.Text = "Salvar";
             btnSalvar.UseVisualStyleBackColor = false;
-            btnSalvar.Click += btnSalvar_Click;
             // 
             // label1
             // 
@@ -160,8 +159,10 @@
             Controls.Add(txtEmail);
             Controls.Add(txtCpf);
             Controls.Add(txtNome);
+            MaximizeBox = false;
             Name = "FormCadastroCliente";
-            Text = "FormCadastroCliente";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Cadastro Cliente";
             ResumeLayout(false);
             PerformLayout();
         }

@@ -2,78 +2,60 @@
 using System.Linq;
 using System.Windows.Forms;
 using VendinhaPlena.Desktop.Data;
-using VendinhaPlena.Desktop.Validations;
+using VendinhaPlena.Desktop.Services;
 
 namespace VendinhaPlena.Desktop
 {
     public partial class FormEditarCliente : Form
     {
-        private readonly AppDbContext _context;
-        private readonly int _clienteId;
+        private readonly ClienteService _servicoDeClientes;
+        private readonly int _idCliente;
 
-        public FormEditarCliente(AppDbContext context, int clienteId)
+        public FormEditarCliente(AppDbContext bancoDeDados, int idCliente)
         {
             InitializeComponent();
-
-            _context = context;
-            _clienteId = clienteId;
+            _servicoDeClientes = new ClienteService(bancoDeDados);
+            _idCliente = idCliente;
 
             this.Load += FormEditarCliente_Load;
             btnSalvar.Click += btnSalvar_Click;
+            btnCancelar.Click += btnCancelar_Click;
         }
 
         private void FormEditarCliente_Load(object sender, EventArgs e)
         {
-            var cliente = _context.Clientes.Find(_clienteId);
+            var clienteParaEdicao = _servicoDeClientes.ObterClientePorId(_idCliente);
 
-            if (cliente != null)
+            if (clienteParaEdicao != null)
             {
-                txtNome.Text = cliente.NomeCompleto;
-                txtCpf.Text = cliente.Cpf;
-                dtpDataNascimento.Value = cliente.DataNascimento;
-                txtEmail.Text = cliente.Email;
+                txtNome.Text = clienteParaEdicao.NomeCompleto;
+                txtCpf.Text = clienteParaEdicao.Cpf;
+                dtpDataNascimento.Value = clienteParaEdicao.DataNascimento;
+                txtEmail.Text = clienteParaEdicao.Email;
             }
         }
 
         private void btnSalvar_Click(object sender, EventArgs e)
         {
-            string nome = txtNome.Text.Trim();
-            string cpf = new string(txtCpf.Text.Where(char.IsDigit).ToArray());
-            string email = txtEmail.Text.Trim();
+            var clienteParaEdicao = _servicoDeClientes.ObterClientePorId(_idCliente);
 
-            if (string.IsNullOrWhiteSpace(nome) || string.IsNullOrWhiteSpace(cpf) || cpf.Length != 11)
+            if (clienteParaEdicao == null) return;
+
+            clienteParaEdicao.NomeCompleto = txtNome.Text.Trim();
+            clienteParaEdicao.Cpf = new string(txtCpf.Text.Where(char.IsDigit).ToArray());
+            clienteParaEdicao.DataNascimento = dtpDataNascimento.Value;
+            clienteParaEdicao.Email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim();
+
+            string resultadoDaOperacao = _servicoDeClientes.SalvarCliente(clienteParaEdicao);
+
+            if (resultadoDaOperacao == "Sucesso")
             {
-                MessageBox.Show("Nome e CPF são obrigatórios.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            if (!ValidadorCpf.IsCpfValido(cpf))
-            {
-                MessageBox.Show("O CPF informado é inválido.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            bool cpfPertenceAOutro = _context.Clientes.Any(c => c.Cpf == cpf && c.Id != _clienteId);
-
-            if (cpfPertenceAOutro)
-            {
-                MessageBox.Show("Este CPF já está sendo usado por outro cliente.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            var cliente = _context.Clientes.Find(_clienteId);
-
-            if (cliente != null)
-            {
-                cliente.NomeCompleto = nome;
-                cliente.Cpf = cpf;
-                cliente.DataNascimento = dtpDataNascimento.Value;
-                cliente.Email = string.IsNullOrWhiteSpace(email) ? null : email;
-
-                _context.SaveChanges();
-
-                MessageBox.Show("Dados atualizados com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Os dados do cliente foram atualizados com sucesso!", "Atualização Concluída", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Close();
+            }
+            else
+            {
+                MessageBox.Show(resultadoDaOperacao, "Atenção aos Dados", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

@@ -159,8 +159,10 @@
             Controls.Add(txtEmail);
             Controls.Add(txtCpf);
             Controls.Add(txtNome);
+            MaximizeBox = false;
             Name = "FormEditarCliente";
-            Text = "FormEditarCliente";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Editar Cliente";
             Load += FormEditarCliente_Load;
             ResumeLayout(false);
             PerformLayout();

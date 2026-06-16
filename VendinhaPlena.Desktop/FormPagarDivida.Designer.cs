@@ -61,14 +61,16 @@
             btnBuscar.TabIndex = 2;
             btnBuscar.Text = "Buscar";
             btnBuscar.UseVisualStyleBackColor = true;
-            btnBuscar.Click += btnBuscar_Click;
             // 
             // gridDividas
             // 
+            gridDividas.AllowUserToAddRows = false;
             gridDividas.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             gridDividas.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             gridDividas.Location = new Point(12, 115);
             gridDividas.Name = "gridDividas";
+            gridDividas.ReadOnly = true;
+            gridDividas.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             gridDividas.Size = new Size(545, 154);
             gridDividas.TabIndex = 3;
             // 
@@ -103,8 +105,10 @@
             Controls.Add(btnBuscar);
             Controls.Add(txtIdCliente);
             Controls.Add(label1);
+            MaximizeBox = false;
             Name = "FormPagarDivida";
-            Text = "FormPagarDivida";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Pagar Divida";
             ((System.ComponentModel.ISupportInitialize)gridDividas).EndInit();
             ResumeLayout(false);
             PerformLayout();

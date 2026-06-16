@@ -106,7 +106,6 @@
             btnCancelar.TabIndex = 6;
             btnCancelar.Text = "Cancelar";
             btnCancelar.UseVisualStyleBackColor = false;
-            btnCancelar.Click += btnCancelar_Click;
             // 
             // FormPendurarDivida
             // 
@@ -120,8 +119,10 @@
             Controls.Add(btnSalvar);
             Controls.Add(txtValor);
             Controls.Add(txtIdCliente);
+            MaximizeBox = false;
             Name = "FormPendurarDivida";
-            Text = "CadastrarDivida";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Cadastrar Divida";
             ResumeLayout(false);
             PerformLayout();
         }
@@ -135,5 +136,6 @@
         private Label label2;
         private Label label3;
         private Button btnCancelar;
+        
     }
 }

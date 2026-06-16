@@ -1,96 +1,67 @@
 ﻿using System;
-using System.Linq;
 using System.Windows.Forms;
-using Microsoft.EntityFrameworkCore;
 using VendinhaPlena.Desktop.Data;
+using VendinhaPlena.Desktop.Services;
 
 namespace VendinhaPlena.Desktop
 {
     public partial class FormPagarDivida : Form
     {
-        private readonly AppDbContext _context;
-        private int _dividaAbertaId;
+        private readonly DividaService _servicoDeDividas;
+        private int? _idDaDividaPendente = null;
 
-        public FormPagarDivida(AppDbContext context)
+        public FormPagarDivida(AppDbContext bancoDeDados)
         {
             InitializeComponent();
+            _servicoDeDividas = new DividaService(bancoDeDados);
 
-            _context = context;
+            btnBuscar.Click += btnBuscar_Click;
+            btnPagar.Click += btnPagar_Click;
             btnPagar.Enabled = false;
         }
 
         private void btnBuscar_Click(object sender, EventArgs e)
         {
-            if (!int.TryParse(txtIdCliente.Text, out int clienteId))
+            if (!int.TryParse(txtIdCliente.Text, out int idCliente))
             {
-                MessageBox.Show("Digite um ID de Cliente válido (apenas números).", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Por favor, informe um número de ID válido para buscar o cliente.", "Atenção", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var cliente = _context.Clientes
-                .Include(c => c.Dividas)
-                .FirstOrDefault(c => c.Id == clienteId);
+            var historicoDeDividas = _servicoDeDividas.ObterDividasDoCliente(idCliente, out _idDaDividaPendente);
 
-            if (cliente == null)
+            if (historicoDeDividas == null)
             {
-                MessageBox.Show("Cliente não encontrado.", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Não conseguimos localizar nenhum cliente com o ID informado.", "Cliente Não Encontrado", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 gridDividas.DataSource = null;
                 btnPagar.Enabled = false;
                 return;
             }
 
-            var listaDividas = cliente.Dividas
-                .OrderByDescending(d => d.DataCriacao)
-                .Select(d => new
-                {
-                    Código = d.Id,
-                    Valor = $"R$ {d.Valor:F2}",
-                    Situação = d.Situacao ? "Paga" : "Em Aberto",
-                    Criada_Em = d.DataCriacao.ToString("dd/MM/yyyy"),
-                    Paga_Em = d.DataPagamento?.ToString("dd/MM/yyyy") ?? "-"
-                })
-                .ToList();
+            gridDividas.DataSource = historicoDeDividas;
+            btnPagar.Enabled = _idDaDividaPendente.HasValue;
 
-            gridDividas.DataSource = listaDividas;
-
-            var dividaAberta = cliente.Dividas.FirstOrDefault(d => d.Situacao == false);
-
-            if (dividaAberta != null)
+            if (!_idDaDividaPendente.HasValue)
             {
-                _dividaAbertaId = dividaAberta.Id;
-                btnPagar.Enabled = true;
-            }
-            else
-            {
-                _dividaAbertaId = 0;
-                btnPagar.Enabled = false;
-                MessageBox.Show("Este cliente não possui dívidas em aberto no momento.", "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Excelente! Este cliente não possui nenhuma dívida pendente no momento.", "Situação Regular", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
         private void btnPagar_Click(object sender, EventArgs e)
         {
-            var confirmacao = MessageBox.Show(
-                "Tem certeza que deseja marcar a dívida em aberto como PAGA?",
-                "Confirmar Pagamento",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question
-            );
-
-            if (confirmacao == DialogResult.Yes)
+            if (_idDaDividaPendente.HasValue)
             {
-                var divida = _context.Dividas.Find(_dividaAbertaId);
+                var confirmacao = MessageBox.Show("Deseja realmente confirmar o pagamento da dívida em aberto deste cliente?", "Confirmar Pagamento", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-                if (divida != null)
+                if (confirmacao == DialogResult.Yes)
                 {
-                    divida.Situacao = true;
-                    divida.DataPagamento = DateTime.Now;
+                    string resultadoDaOperacao = _servicoDeDividas.PagarDivida(_idDaDividaPendente.Value);
 
-                    _context.SaveChanges();
-
-                    MessageBox.Show("Dívida marcada como paga com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                    btnBuscar_Click(sender, e);
+                    if (resultadoDaOperacao == "Sucesso")
+                    {
+                        MessageBox.Show("O pagamento foi registrado e a dívida foi marcada como paga com sucesso!", "Pagamento Concluído", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        btnBuscar_Click(sender, e);
+                    }
                 }
             }
         }

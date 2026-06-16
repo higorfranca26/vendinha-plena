@@ -1,27 +1,38 @@
-using Microsoft.EntityFrameworkCore;
 using System;
-using System.Linq;
 using System.Windows.Forms;
 using VendinhaPlena.Desktop.Data;
-using VendinhaPlena.Desktop.Models;
+using VendinhaPlena.Desktop.Services;
 
 namespace VendinhaPlena.Desktop
 {
     public partial class Form1 : Form
     {
-        private AppDbContext _context;
+        private AppDbContext _bancoDeDados;
+        private ClienteService _servicoDeClientes;
+
+        private int _paginaAtual = 1;
+        private int _totalDePaginas = 1;
 
         public Form1()
         {
             InitializeComponent();
 
-            _context = new AppDbContext();
-            _context.Database.EnsureCreated();
+            _bancoDeDados = new AppDbContext();
+            _bancoDeDados.Database.EnsureCreated();
+
+            _servicoDeClientes = new ClienteService(_bancoDeDados);
 
             this.Load += Form1_Load;
+
+            btnBuscar.Click += btnBuscar_Click;
+            btnAnterior.Click += btnAnterior_Click;
+            btnProximo.Click += btnProximo_Click;
+
+            btnNovoCliente.Click += btnNovoCliente_Click;
+            btnEditarCliente.Click += btnEditarCliente_Click;
+            btnExcluirCliente.Click += btnExcluirCliente_Click;
             btnPendurarDivida.Click += btnPendurarDivida_Click;
             btnPagarDivida.Click += btnPagarDivida_Click;
-            btnEditarCliente.Click += btnEditarCliente_Click;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -31,45 +42,47 @@ namespace VendinhaPlena.Desktop
 
         private void AtualizarTabela()
         {
-            var clientes = _context.Clientes
-                .Include(c => c.Dividas)
-                .ToList()
-                .OrderByDescending(c => c.TotalDevido)
-                .Take(10)
-                .Select(c => new
-                {
-                    c.Id,
-                    Nome = c.NomeCompleto,
-                    c.Cpf,
-                    Idade = c.Idade,
-                    Total_Devido = $"R$ {c.TotalDevido:F2}"
-                })
-                .ToList();
+            string nomeBuscado = txtBusca.Text.Trim();
 
-            gridClientes.DataSource = clientes;
+            var resultado = _servicoDeClientes.ObterClientes(nomeBuscado, _paginaAtual);
+
+            gridClientes.DataSource = resultado.Lista;
+            _totalDePaginas = resultado.TotalPaginas;
+
+            lblPagina.Text = $"Página {_paginaAtual} de {_totalDePaginas}";
+
+            btnAnterior.Enabled = _paginaAtual > 1;
+            btnProximo.Enabled = _paginaAtual < _totalDePaginas;
+        }
+
+        private void btnBuscar_Click(object sender, EventArgs e)
+        {
+            _paginaAtual = 1;
+            AtualizarTabela();
+        }
+
+        private void btnAnterior_Click(object sender, EventArgs e)
+        {
+            if (_paginaAtual > 1)
+            {
+                _paginaAtual--;
+                AtualizarTabela();
+            }
+        }
+
+        private void btnProximo_Click(object sender, EventArgs e)
+        {
+            if (_paginaAtual < _totalDePaginas)
+            {
+                _paginaAtual++;
+                AtualizarTabela();
+            }
         }
 
         private void btnNovoCliente_Click(object sender, EventArgs e)
         {
-            var formCadastro = new FormCadastroCliente(_context);
-            formCadastro.ShowDialog();
-
-            AtualizarTabela();
-        }
-
-        private void btnPendurarDivida_Click(object sender, EventArgs e)
-        {
-            var formDivida = new FormPendurarDivida(_context);
-            formDivida.ShowDialog();
-
-            AtualizarTabela();
-        }
-
-        private void btnPagarDivida_Click(object sender, EventArgs e)
-        {
-            var formPagar = new FormPagarDivida(_context);
-            formPagar.ShowDialog();
-
+            var telaCadastro = new FormCadastroCliente(_bancoDeDados);
+            telaCadastro.ShowDialog();
             AtualizarTabela();
         }
 
@@ -77,15 +90,14 @@ namespace VendinhaPlena.Desktop
         {
             if (gridClientes.CurrentRow == null)
             {
-                MessageBox.Show("Selecione um cliente na tabela primeiro para editar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Por favor, selecione um cliente na tabela primeiro para poder editar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            int idSelecionado = Convert.ToInt32(gridClientes.CurrentRow.Cells["Id"].Value);
+            int idClienteSelecionado = Convert.ToInt32(gridClientes.CurrentRow.Cells["Id"].Value);
 
-            var formEditar = new FormEditarCliente(_context, idSelecionado);
-            formEditar.ShowDialog();
-
+            var telaEdicao = new FormEditarCliente(_bancoDeDados, idClienteSelecionado);
+            telaEdicao.ShowDialog();
             AtualizarTabela();
         }
 
@@ -93,31 +105,41 @@ namespace VendinhaPlena.Desktop
         {
             if (gridClientes.CurrentRow == null)
             {
-                MessageBox.Show("Selecione um cliente na tabela primeiro.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Por favor, selecione um cliente na tabela primeiro.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            int idSelecionado = Convert.ToInt32(gridClientes.CurrentRow.Cells["Id"].Value);
-            var cliente = _context.Clientes.Find(idSelecionado);
+            int idClienteSelecionado = Convert.ToInt32(gridClientes.CurrentRow.Cells["Id"].Value);
+            var cliente = _bancoDeDados.Clientes.Find(idClienteSelecionado);
 
             if (cliente != null)
             {
-                var confirmacao = MessageBox.Show(
-                    $"Tem certeza que deseja excluir o cliente {cliente.NomeCompleto}?\n\nAVISO: Todas as dívidas atreladas a ele também serão apagadas permanentemente!",
-                    "Confirmar Exclusão",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning
-                );
+                var mensagem = $"Tem certeza que deseja excluir o cliente {cliente.NomeCompleto}?\n\nAVISO: Todas as dívidas vinculadas a este cliente também serão apagadas permanentemente!";
+                var confirmacao = MessageBox.Show(mensagem, "Confirmar Exclusão", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
                 if (confirmacao == DialogResult.Yes)
                 {
-                    _context.Clientes.Remove(cliente);
-                    _context.SaveChanges();
+                    _bancoDeDados.Clientes.Remove(cliente);
+                    _bancoDeDados.SaveChanges();
 
                     MessageBox.Show("Cliente excluído com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     AtualizarTabela();
                 }
             }
+        }
+
+        private void btnPendurarDivida_Click(object sender, EventArgs e)
+        {
+            var telaDivida = new FormPendurarDivida(_bancoDeDados);
+            telaDivida.ShowDialog();
+            AtualizarTabela();
+        }
+
+        private void btnPagarDivida_Click(object sender, EventArgs e)
+        {
+            var telaPagar = new FormPagarDivida(_bancoDeDados);
+            telaPagar.ShowDialog();
+            AtualizarTabela();
         }
     }
 }
